@@ -25,6 +25,11 @@ io.on('connection', (socket) => {
         socket.broadcast.emit("playerUpdate", data);
     })
 
+    socket.on("discTouch" , (discVelocity) => {
+        console.log(discVelocity);
+        socket.broadcast.emit("discUpdate" , discVelocity);
+    })
+
     // Handle disconnection
     socket.on('disconnect', () => {
         countUsers--;
