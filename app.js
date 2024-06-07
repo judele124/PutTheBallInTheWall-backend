@@ -5,35 +5,67 @@ const cors = require('cors'); // Import CORS middleware
 const server = http.createServer();
 const io = socketIo(server, {
     cors: {
-        origin: true
+        origin: "*", // Allow all origins. Adjust this for production to be more specific.
+        methods: ["GET", "POST"],
     }
 });
 
-let countUsers = 0;
-
+const rooms = {}; // To keep track of players in each room
 
 // Socket.IO events
 io.on('connection', (socket) => {
-    console.log(`user id ${socket.id}`);
-    countUsers++;
-    // Listen for messages from clients
-    socket.emit("playerConnected", countUsers);
+    console.log(`User connected: ${socket.id}`);
 
-    if (countUsers == 2) io.emit("startGame")
+    socket.on("joinRoom", (roomName) => {
+        console.log(`User ${socket.id} joining room: ${roomName}`);
+        socket.join(roomName);
 
-    socket.on("playerMovement", (data) => {
-        socket.broadcast.emit("playerUpdate", data);
-    })
+        // Initialize the room in the rooms object if it doesn't exist
+        if (!rooms[roomName]) {
+            rooms[roomName] = 0;
+        }
 
-    socket.on("discTouch", (discVelocity) => {
-        socket.broadcast.emit("discUpdate", discVelocity);
-    })
+        // Increment the player count in the room
+        rooms[roomName]++;
+        console.log(`Room ${roomName} now has ${rooms[roomName]} players`);
 
-    // Handle disconnection
-    socket.on('disconnect', () => {
-        countUsers--;
-        console.log('A user disconnected');
-        io.emit("playerConnected", countUsers);
+        // Emit the current number of connected players in the room
+        socket.emit("playerConnected", rooms[roomName]);
+
+        // Start the game if there are exactly 2 players in the room
+        if (rooms[roomName] === 2) {
+            io.in(roomName).emit("startGame");
+        }
+
+        // Handle player movement
+        socket.on("playerMovement", (data) => {
+            console.log(roomName);
+            socket.to(roomName).emit("playerUpdate", data);
+        });
+
+        // Handle disc touch
+        socket.on("discTouch", (discVelocity) => {
+            socket.to(roomName).emit("discUpdate", discVelocity);
+        });
+
+        // Handle disconnection
+        socket.on('disconnect', () => {
+            rooms[roomName]--;
+            console.log(`User disconnected: ${socket.id} from room: ${roomName}`);
+            console.log(`Room ${roomName} now has ${rooms[roomName]} players`);
+
+            io.in(roomName).emit("playerConnected", rooms[roomName]);
+
+            // Optionally stop the game if a player disconnects
+            if (rooms[roomName] < 2) {
+                io.in(roomName).emit("stopGame");
+            }
+
+            // Clean up the room if no players are left
+            if (rooms[roomName] === 0) {
+                delete rooms[roomName];
+            }
+        });
     });
 });
 
