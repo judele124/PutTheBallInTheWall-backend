@@ -45,7 +45,7 @@ io.on('connection', (socket) => {
 
         // Handle disc touch
         socket.on("discTouch", (discVelocity) => {
-            socket.to(roomName).emit("discUpdate", discVelocity);
+            io.in(roomName).emit("discUpdate", discVelocity);
         });
 
         // Handle disconnection
@@ -54,12 +54,7 @@ io.on('connection', (socket) => {
             console.log(`User disconnected: ${socket.id} from room: ${roomName}`);
             console.log(`Room ${roomName} now has ${rooms[roomName]} players`);
 
-            io.in(roomName).emit("playerConnected", rooms[roomName]);
-
-            // Optionally stop the game if a player disconnects
-            if (rooms[roomName] < 2) {
-                io.in(roomName).emit("stopGame");
-            }
+            io.in(roomName).emit("playerDisconnected");
 
             // Clean up the room if no players are left
             if (rooms[roomName] === 0) {
